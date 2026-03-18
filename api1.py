@@ -82,9 +82,13 @@ def get_all_records(vehicleId: str = Query(..., description="Vehicle ID to fetch
         # Read CSV
         df = pd.read_csv(CSV_FILE)
 
-        # Replace NaN / inf / -inf with None (JSON compliant)
-        df = df.replace([np.inf, -np.inf], np.nan)
-        df = df.where(pd.notnull(df), None)
+        # # Replace NaN / inf / -inf with None (JSON compliant)
+        # df = df.replace([np.inf, -np.inf], np.nan)
+        # df = df.where(pd.notnull(df), None)
+        for col in df.columns:
+            if pd.api.types.is_numeric_dtype(df[col]):
+                df[col] = pd.to_numeric(df[col], errors='coerce')  # invalid -> NaN
+                df[col] = df[col].replace([np.inf, -np.inf], None)
 
         # Convert rows to JSON
         records = df.to_dict(orient="records")
