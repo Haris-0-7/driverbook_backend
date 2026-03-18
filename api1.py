@@ -56,6 +56,9 @@ def get_latest_record(vehicleId: str = Query(..., description="Vehicle ID to fet
         # Get latest row
         latest_row = df_sorted.iloc[-1].to_dict()
 
+        # Single line JSON-safe conversion
+        latest_row = {k: (float(v) if isinstance(v,(int,float,np.integer,np.floating)) and pd.notnull(v) else v) for k,v in latest_row.items()}
+
         # Get all historical fuelLevel_pct as list
         if "fuelLevel_pct" in df_sorted.columns:
             latest_row["fuelLevel_pct"] = df_sorted["fuelLevel_pct"].astype(float).tolist()
@@ -82,16 +85,8 @@ def get_all_records(vehicleId: str = Query(..., description="Vehicle ID to fetch
         # Read CSV
         df = pd.read_csv(CSV_FILE)
 
-        # # Replace NaN / inf / -inf with None (JSON compliant)
-        # df = df.replace([np.inf, -np.inf], np.nan)
-        # df = df.where(pd.notnull(df), None)
-        for col in df.columns:
-            if pd.api.types.is_numeric_dtype(df[col]):
-                df[col] = pd.to_numeric(df[col], errors='coerce')  # invalid -> NaN
-                df[col] = df[col].replace([np.inf, -np.inf], None)
-
-        # Convert rows to JSON
-        records = df.to_dict(orient="records")
+        # Single line: numeric JSON-safe conversion for all rows
+        records = df.applymap(lambda v: float(v) if isinstance(v,(int,float,np.integer,np.floating)) and pd.notnull(v) else (None if pd.isna(v) else v)).to_dict(orient="records")
 
         return JSONResponse(content=records)
 
@@ -102,4 +97,3 @@ def get_all_records(vehicleId: str = Query(..., description="Vehicle ID to fetch
         )
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)
-
