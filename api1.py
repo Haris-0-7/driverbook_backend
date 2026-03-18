@@ -57,11 +57,24 @@ def get_latest_record(vehicleId: str = Query(..., description="Vehicle ID to fet
         latest_row = df_sorted.iloc[-1].to_dict()
 
         # Single line JSON-safe conversion
-        latest_row = {k: (float(v) if isinstance(v,(int,float,np.integer,np.floating)) and pd.notnull(v) else v) for k,v in latest_row.items()}
+        safe_latest = {}
+        for k, v in latest_row.items():
+            if pd.isna(v):
+                safe_latest[k] = None
+            elif isinstance(v, (int, float, np.integer, np.floating)):
+                if np.isinf(v):
+                    safe_latest[k] = None
+                else:
+                    safe_latest[k] = float(v)
+            else:
+                safe_latest[k] = v
+        latest_row = safe_latest
 
         # Get all historical fuelLevel_pct as list
         if "fuelLevel_pct" in df_sorted.columns:
-            latest_row["fuelLevel_pct"] = df_sorted["fuelLevel_pct"].astype(float).tolist()
+            latest_row["fuelLevel_pct"] = [
+                float(x) if pd.notnull(x) else None for x in df_sorted["fuelLevel_pct"]
+            ]
 
         return JSONResponse(content=latest_row)
 
@@ -85,8 +98,21 @@ def get_all_records(vehicleId: str = Query(..., description="Vehicle ID to fetch
         # Read CSV
         df = pd.read_csv(CSV_FILE)
 
-        # Single line: numeric JSON-safe conversion for all rows
-        records = df.applymap(lambda v: float(v) if isinstance(v,(int,float,np.integer,np.floating)) and pd.notnull(v) else (None if pd.isna(v) else v)).to_dict(orient="records")
+        # JSON-safe conversion row by row
+        records = []
+        for _, row in df.iterrows():
+            safe_row = {}
+            for col, val in row.items():
+                if pd.isna(val):
+                    safe_row[col] = None
+                elif isinstance(val, (int, float, np.integer, np.floating)):
+                    if np.isinf(val):
+                        safe_row[col] = None
+                    else:
+                        safe_row[col] = float(val)
+                else:
+                    safe_row[col] = val
+            records.append(safe_row)
 
         return JSONResponse(content=records)
 
